@@ -1,0 +1,216 @@
+/* 
+ * CSCI E-66: Problem Set 1, SQL Programming Problems
+ *
+ * Put your name and email address below:
+ *     name: Ryan Ballenger
+ *     email: ballenger@g.harvard.edu
+ */
+
+/**********************************************************
+ * REMEMBER: You should include only the SQL commands,
+ * *NOT* the results that they produce.
+ **********************************************************/
+
+/*
+ * Problem 5. Put your SQL command for this problem below.	
+ */
+SELECT M.name, O.type, O.year
+FROM Person P, Oscar O, Movie M
+WHERE P.name = "Cate Blanchett" 
+   AND P.id = O.person_id
+   AND M.id = O.movie_id;
+
+
+
+/*
+ * Problem 6. Put your SQL command for this problem below.	
+ */
+SELECT P.name, P.pob, P.dob
+FROM Person P
+WHERE P.name = "Matt Damon"
+   OR P.name = "Leonardo DiCaprio";
+
+
+
+/*
+ * Problem 7. Put your SQL command for this problem below.	
+ */
+SELECT DISTINCT PD.name
+FROM Oscar O, Actor A, Person PA, Director D, Person PD
+WHERE O.person_id = A.actor_id
+   AND O.movie_id = A.movie_id
+   AND PA.id = A.actor_id
+   AND PA.pob NOT LIKE '%USA%'
+   AND D.movie_id = O.movie_id
+   AND D.director_id = PD.id
+   AND PD.pob NOT LIKE '%USA%'
+
+/*
+ * Problem 8. Put your SQL command for this problem below.	
+ */
+SELECT BP.year, M.name
+FROM Movie M, OSCAR BP, OSCAR BD
+WHERE M.id = BP.movie_id
+   AND M.id = BD.movie_id
+   AND BP.type = "BEST-PICTURE"
+   AND BD.type = "BEST-DIRECTOR";
+
+
+
+/*
+ * Problem 9. Put your SQL command for this problem below.	
+ */
+SELECT count(*)
+FROM Movie M
+WHERE runtime > 200;
+
+
+/*
+ * Problem 10. Put your SQL command for this problem below.	
+ */
+SELECT P.name, P.dob
+FROM Person P
+Where name LIKE 'Julia %'
+
+
+
+/*
+ * Problem 11. Put your SQL command for this problem below.	
+ */
+Select V.name
+From Movie V
+Where V.runtime <(
+   SELECT min(M.runtime)
+   FROM Movie M, Oscar O
+   WHERE M.id = O.movie_id
+      AND O.type = "BEST-PICTURE"
+   )
+
+
+
+/*
+ * Problem 12. Put your SQL command for this problem below.	
+ */
+SELECT P.name, count(*) as Total
+FROM Director D, Movie M, Person P 
+WHERE D.movie_id = M.id
+   AND M.earnings_rank <= 200
+   AND P.id = D.director_id
+GROUP BY D.director_id
+ORDER BY Total DESC
+
+
+
+/*
+ * Problem 13. Put your SQL command for this problem below.	
+ */
+Select T2.earnings_rank, T2.name, T1.type
+From
+   (SELECT M.earnings_rank, M.name
+   FROM Movie M
+   WHERE M.earnings_rank <=25) T2
+LEFT JOIN
+   (SELECT M.earnings_rank, M.name, O.type
+   FROM Movie M, Oscar O
+   WHERE O.movie_id = M.id) T1
+ON T1.earnings_rank = T2.earnings_rank 
+
+
+
+/*
+ * Problem 14. Put your SQL command for this problem below.	
+ */
+SELECT count(distinct A.actor_id) 
+FROM Actor A
+WHERE A.actor_id NOT IN (
+   SELECT A.actor_id 
+   FROM Movie M, Actor A
+   WHERE M.earnings_rank <= 200
+      AND A.movie_id = M.id)
+
+
+
+
+/*
+ * Problem 15. Put your SQL command for this problem below.	
+ */
+SELECT M.name as Movie, "director" as Function
+FROM Movie M, Director D, Person P
+WHERE D.director_id = P.id
+   AND P.name = "Clint Eastwood"
+   AND D.movie_id = M.id
+UNION
+SELECT M.name, "actor" as Function
+FROM Movie M, Actor A, Person P
+WHERE A.actor_id = P.id
+   AND P.name = "Clint Eastwood"
+   AND A.movie_id = M.id
+ORDER BY Movie
+
+
+
+/*
+ * Problem 16. Put your SQL command for this problem below.	
+ */
+Select M.name, O.year
+From Movie M, Oscar O
+Where M.id = O.movie_id
+   AND O.type = "BEST-PICTURE"
+   AND O.year IN
+      (Select max(O.year)
+      From Oscar O, Movie M
+      Where O.type = "BEST-PICTURE"
+         AND M.id = O.movie_id
+         AND M.rating = "G")
+
+
+
+/*
+ * Problem 17. Put your SQL command for this problem below.	
+ */
+UPDATE Person
+SET pob='Los Angeles, California, USA', dob='1982-7-24'
+Where name = "Elisabeth Moss"
+
+
+
+/*
+ * Problem 18 (required for grad-credit students; optional for others). 
+ * Put your SQL command for this problem below.	
+ */
+Select  type, avg(count)
+From 
+   (Select distinct C.actor_id, C.count, O.type
+   From Oscar O,
+      (SELECT A.actor_id, count(*) as count
+      FROM Actor A
+      GROUP BY A.actor_id) C
+   Where (O.type="BEST-SUPPORTING-ACTOR"
+       OR O.type = "BEST-SUPPORTING-ACTRESS"
+       OR O.type = "BEST-ACTOR"
+       OR O.type = "BEST-ACTRESS")  
+       AND O.person_id=C.actor_id)
+GROUP BY type
+
+
+/*
+ * Problem 19 (required for grad-credit students; optional for others). 
+ * Put your SQL command(s) for this problem below.	
+ */
+DROP TABLE IF EXISTS ONE ;
+
+CREATE TEMPORARY TABLE One AS
+Select OA.actor_id 
+From Actor A, Person P, Actor OA
+Where P.name = "Kevin Bacon"
+   AND A.actor_id = P.id
+   AND OA.movie_id = A.movie_id
+   AND OA.actor_id  <> A.actor_id;
+
+Select distinct (AP.name) 
+From Actor A, Person AP, Actor B 
+Where A.actor_id NOT IN One
+   AND A.movie_id = B.movie_id
+   AND B.actor_id IN One
+   AND AP.id = A.actor_id;
+

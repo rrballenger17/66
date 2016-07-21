@@ -1,0 +1,364 @@
+1.a)
+undo-redo logging 
+
+A				B			C			D
+old:100
+new: 110
+				old:200
+				new:210
+							old:300
+							new:310
+										old:400
+										new:410
+				old:210
+				new:220
+										old:410
+										new:420
+
+
+Dirty database pages are not forced to disk meaning 
+that each item could be any of the possible values. 
+
+Possible Values:
+A: 100, 110
+B: 200, 210, 220
+C: 300, 310
+D: 400, 410, 420
+
+
+1.b)
+undo-only
+Txn 2's database pages are forced to disk when it commits. 
+Undo-only does this to eliminate the need to redo committed transactions.
+
+A				B			C			D
+
+				new:210
+							old:300
+							new:310
+										new:410
+
+old:100
+new:110
+				old:210
+				new:220					
+										old:410
+										new:420
+Possible Values:
+A: 100, 110
+B: 210, 220
+C: 300, 310
+D: 410, 420
+
+
+1.c)
+redo-only
+
+Database pages are held in memory until the commit.
+None of txn 1's changes are on disk.
+
+A				B			C			D
+				old: 200
+				new: 210		
+										old: 400
+										new: 410
+Possible Values:
+A: 100
+B: 200, 210
+C: 300
+D: 400, 410
+
+
+1.d) 
+Backward pass:
+	Uncommited changes are undone and a commit list is made. 
+All the changes by txn 1 are undone. Txn 2 is added to the commit
+list and its change are skipped. 
+	During the backward pass the following values are restored. Also, 
+the backward pass proceeds from the most recent to the oldest record, 
+to ensure that values are undone sequentially.
+		D: 410
+		B: 210
+		C: 300
+		A: 100
+
+0:		Skip
+10: A = 100
+20: 	Skip
+30:		Skip
+40: C = 300	
+50:		Skip
+60: txn 2 added to commit list
+70: B = 210
+80: D = 410
+
+Forward pass:
+	Committed changes, specifically by txn 2, are redone and 
+the other changes are skipped. The forward pass proceeds from the oldest
+to the most recent record, to redo the changes as they occurred. Item B and 
+D have changes redone and are restored to the following values.
+	Redone updates from txn's on commit list:
+		B: 210
+		D: 410
+
+0:		Skip
+10: 	Skip - txn not committed
+20: 	Skip
+30: B = 210
+40: 	Skip - txn not commited
+50:	D = 410
+60:		Skip 
+70: 	Skip - txn not committed
+80: 	Skip - txn not committed
+
+
+
+
+1.e)
+datum LSNs:
+A:*10, 0				B:*70, 30				C:0					D:*0,50
+
+Backward pass:
+	During the backward pass, uncommitted changes are undo if the item's datum 
+LSN is equal to the record LSN. Other changes are skipped, and the pass proceeds
+from the most recent to the oldest record to undo them in order. 
+	Overall, the change at LSN 70 is undone setting B=210 and B datum= 30. Then, 
+the change at LSN 10 is undone since 10==10. Item A is set to 100 and A datum is 
+set to 0. The rest of the records are skipped because they were committed or
+didn't make it to disk. 
+
+0:		Skip
+10: 10 == 10, A = 100, A_datum = 0
+20: 	Skip
+30:		Skip - txn on commit list
+40: 	Skip - 40 != 0 
+50:		Skip - txn on commit list
+60: Add txn 2 to commit list 
+70: 70 == 70, B=210, B_datum = 30 
+80: 	Skip - 80 != 0 
+
+
+Forward pass:
+	During the forward pass, committed transactions where the item's datum LSN
+is equal to the OLSN are redone. All other steps are skipped. Only txn 2's
+changes are considered since it committed. The only adjustment is at LSN 
+50, where D is set to 410 and D datum is set to 50 since D datum equals the OLSN. 
+Also, the forward pass proceeds from oldest to the most recent records to 
+redo transactions in the order they occurred. 
+
+0:		Skip
+10: 	Skip - txn not committed
+20: 	Skip
+30: 	Skip - 0 != 30
+40: 	Skip - txn not commited
+50:	0 == 0, D = 410, D_datum: 50
+60:		Skip 
+70: 	Skip - txn not committed
+80: 	Skip - txn not committed
+
+
+1.f)
+The backward pass still must proceed until LSN = 0 to reach where txn 1 begins. 
+It's an active transaction that needs to be checked. However the forward pass starts 
+at 40 because all transactions before that do not need redone. The dynamic checkpoint
+confirms that their changes made it to disk enabling the forward pass to start at LSN 40.
+
+
+2. a)
+
+
+- Authors' id and Books' isbn are required since they are the primary keys.
+- DOB is optional, using ?
+- Genre's value is stored in an attribute to set the default to "fiction"
+- Attributes books and authorIDs are required for 1 or more books per author or vice versa.
+- Data types cannot be specified.
+
+
+<!ELEMENT Book-data ((Author|Book)*)>
+
+<!ELEMENT Author (name, dob?)>
+<!ATTLIST Author
+    id ID #REQUIRED
+    books IDREFS #REQUIRED>
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT dob (#PCDATA)>
+
+<!ELEMENT Book (title, publisher, num_pages, genre)>
+<!ATTLIST Book
+    isbn ID #REQUIRED
+    authorIDs IDREFS #REQUIRED>
+<!ELEMENT title (#PCDATA)>
+<!ELEMENT publisher (#PCDATA)>
+<!ELEMENT num_pages (#PCDATA)>
+<!ELEMENT genre (EMPTY)>
+<!ATTLIST genre
+    genreName CDATA "fiction">
+
+
+
+2. b)
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	<xs:element name="BookData">
+		<xs:complexType>
+			<xs:sequence>
+
+
+				<xs:element name="Author">
+					<xs:complexType>
+
+						<xs:sequence>
+							<xs:element name="name" type="xs:string" minOccurs="1" maxOccurs="1"/>
+							<xs:element name="dob" type="xs:date" minOccurs="0" maxOccurs="1" />
+						</xs:sequence>
+
+						<xs:attribute name="id" type="xs:ID" use="required" />
+						<xs:attribute name="bookIDs" type="xs:IDREFS" use="required"/>
+
+					</xs:complexType>
+				</xs:element>
+
+				<xs:element name="Book">
+					<xs:complexType>
+
+						<xs:all>
+							<xs:element name="title" type="xs:string" />
+
+							<xs:element name="publisher" type="xs:string"/>
+			
+							<xs:element name="num_pages">
+								<xs:simpleType>
+          								<xs:restriction base="xs:integer">
+               									<xs:minInclusive value="1" />
+          								</xs:restriction>
+      								</xs:simpleType>
+      							</xs:element>
+
+							<xs:element name="genre">
+								<xs:complexType>
+									<xs:attribute name="genreType" type="xs:string" default="fiction" />
+								</xs:complexType>
+							</xs:element>
+
+						</xs:all>
+
+						<xs:attribute name="isbn" type="xs:ID" use="required" />
+
+						<xs:attribute name="authorIDs" type="xs:IDREFS" use="required" />
+
+					</xs:complexType>
+				</xs:element>
+
+			</xs:sequence>
+
+		</xs:complexType>
+
+	</xs:element>
+
+</xs:schema>
+
+
+
+3. a)
+ODL
+
+class Author (key (id)) {
+	attribute string id;
+	attribute string name;
+	attribute string dob;
+
+	relationship Set<Book> authoredBooks
+				inverse Book:: bookAuthors;
+
+}
+
+class Book (key (isbn)) {
+	attribute string isbn;
+	attribute string title;
+	attribute string publisher;
+	attribute integer num_pages;
+	attribute string genre;
+
+	relationship Set<Author> bookAuthors
+				inverse Author:: authoredBooks;
+
+}
+
+
+3. b)
+Object-Relational Model
+
+- underline id and isbn
+
+Author(id, name, dob, books({*Book}));
+
+Book(isbn, title, publisher, num_pages, genre, authors({*Author}));
+
+
+3. c)
+
+Select B.title
+From Book AS B, unnest(B.authors) AS A(Author)
+Where  A.Author->name = 'J.K. Rowling'
+   AND B.publisher = 'Hogwarts Press';
+
+
+4.)
+
+
+Describe what types of log records you would use (including any additional information that you would add to existing log-record types).
+
+	In dynamic checkpoint logs, active transactions' first update LSN would be stored. This value is 
+	available in memory and would be stored along with the list of active transactions. This is the
+	only change in my version along with the elimination of begin transaction records.
+	
+
+When the various record types would be used.
+	When performing a recovery, if a dynamic checkpoint is available, calculate the smallest first-update LSN
+	of the active transactions. Proceed backward until this LSN is reached. This process is equivalent to the backward 
+	pass continuing until it reaches the end of the active transactions, only now it calculates where this point is. 
+
+
+How you would perform recovery using a log produced by the new scheme.
+
+Backward pass:
+	For each update by a transaction not on the commit list,
+	undo the update if the datum LSN == the record LSN.
+	When we undo, set the datum LSN = OLSN. As before, start from 
+	the most recent record and move 1 record at a time to the oldest.
+	If a dynamic checkpoint is reached, calculate the smallest first-upate 
+	LSN and stop the backward pass when this LSN is reached. Otherwise 
+	proceed with the backward pass to the start of the records.
+
+Forward pass:
+	For each update by a txn on the commit list, 
+	redo the update if the datum LSN == OLSN.
+	When we redo, set the datum LSN = record LSN. As 
+	before start at the beginning, or at the most recent
+	dynamic checkpoint record if available, and proceed
+	to the most recent record.
+
+The difference is that the smallest first-update LSN at dynamic checkpoints must be calculated. 
+The backward pass should proceed to there. The forward pass should still start after the dynamic checkpoint. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

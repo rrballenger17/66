@@ -1,0 +1,94 @@
+#
+# CSCI E-66: Problem Set 4, Problem 6
+# Querying an XML Database
+#
+# Put your name and email address below:
+#     name: 
+#     email:
+#
+
+########################################################################
+# REMEMBER: 
+#   1. You should include *both* a query and a print command for each 
+#      problem, following the model shown in the sample query below.
+#   2. You should *not* include the results of the queries.
+#   3. You should test that the queries in this file are correct by
+#      executing all of the queries in the file from the command line.
+#      See the assignment for more details.
+########################################################################
+
+# Do not modify the following line.
+openContainer imdb.dbxml
+
+#
+# Sample query: Find the names of all movies in the database from 1990.
+#
+echo "results of sample query"
+echo "-----------------------"
+query 'for $m in collection("imdb.dbxml")//movie 
+       where $m/year = 1990
+       return $m/name'
+print
+echo ""
+
+#
+# part a. Add your query for this problem in the space provided below.
+# Remember to include both a query command and a print command,
+# putting them between the second and third echo commands.
+#
+
+echo "results for part a"
+echo "------------------"
+query 'collection("imdb.dbxml")//movie[year<=1999 and year >= 1990 and rating="R"]/name'
+print
+echo ""
+
+#
+# part b. Add your query for this problem in the space provided below.
+#
+
+echo "results for part b"
+echo "------------------"
+query 'for $m in collection("imdb.dbxml")//person
+    where contains($m/pob, "Boston, Mass") and
+       empty($m/@actedIn) = false()
+    return $m/name'
+print
+echo ""
+
+#
+# part c. Add your query for this problem in the space provided below.
+#
+
+echo "results for part c"
+echo "------------------"
+query 'for $m in collection("imdb.dbxml")//movie
+let $e := collection("imdb.dbxml")//oscar[@movie_id = $m/@id and type="BEST-PICTURE"]/year
+where empty($e) = false()
+	and $m/rating = "R"
+order by $e ascending
+return <winner>{$m/name/text()} ({$e/text()})</winner>'
+print
+echo ""
+
+#
+# part d. Add your query for this problem in the space provided below.
+#
+
+echo "results for part d"
+echo "------------------"
+query 'for $p in collection("imdb.dbxml")//movie
+	where number($p/earnings_rank/text()) <= 10
+	return <top-grosser>
+			{"\n  ",<name>{$p/name/text()}</name>}
+			{"\n  ",<earnings_rank>{$p/earnings_rank/text()}</earnings_rank>}
+			{for $a in collection("imdb.dbxml")//person
+              where contains(data($p/@actors), data($a/@id))
+              return ("\n  ", <big-star>{$a/name/text()}</big-star>)
+    		}
+           {"\n"}</top-grosser>'
+print
+echo ""
+
+# Do not modify the following line.
+quit

@@ -1,0 +1,260 @@
+
+
+
+
+
+#####
+# 1.
+
+# 1.a)
+
+What steps are needed if the site is using redo-only logging? 
+
+
+Receipt of the prepare message from the coordinator.
+
+The sub-transaction should be finished so all log records are created.
+
+Force all dirty log records to disk. 
+  Comment: This enables the redo-only system to be able to redo.
+  Note: Database pages are not forced to disk until after the commit.
+  
+Force-write a ready record for T to its log.
+
+Send of the ready message to the coordinator.
+
+
+
+# 1.b)
+
+
+Coordinator’s normal steps:
+
+	writes a prepare record 
+
+	sends prepare messages to each participating site
+
+	receives ready messages 
+
+	force writes a commit record for T to its log 
+
+	sends commit messages for T to the participating sites
+
+
+Strategy: As with recovery from a site, the coordinator will finish committing T
+if there is a commit record for T in its log. Otherwise it will make the safe decision
+to abort which is always allowed.
+
+
+Recovery:
+
+If the coordinator has a commit record for T, T is committed. 
+	Check log to see if commit messages were sent to other sites.
+	If not, send a commit message to the necessary sites and log those messages.
+
+If T is not committed, the coordinator can abort transaction T. It 
+	would have written a commit record for T before sending commit
+	messages meaning no sub-transaction is committed. Force write an abort
+	record for T and send abort messages to the sub-transaction sites.
+
+If sub-transactions are in the ready state, they will now abort the transaction T.
+	If they have not reached that state, they will still receive the the message
+	and proceed with aborting transaction T.
+
+
+
+
+
+#####
+# 2.
+
+x > n/2
+
+s > n-x
+
+r > n-w
+
+2.a)
+
+update 6 copies, read 4 copies
+
+r>n–w
+
+4 > 9 - 6 = 3
+
+Yes, it would work because more copies are read, 4,
+than are not updated, 3, and updating 6 copies ensures
+only 1 exclusive lock at a time.	
+
+2.b)
+
+update 7 copies, read 2 copies
+
+r>n–w
+
+2 > 9 - 7 = 2
+
+No, it would not work because the 2 un-updated
+  copies could be read.
+
+2.c)
+
+update 3 copies, read 8 copies
+
+r>n–w
+
+8 > 9 - 3 = 6
+
+No, it would not work because updating 3 copies 
+does not ensure an exclusive lock and schedules may
+not be conflict serializable.
+
+2.d)
+
+update 5 copies, read 5 copies
+
+r>n–w
+
+5 > 9 - 5 = 4
+
+Yes, it would work because more copies are read, 5,
+than are not updated, 4, and 5 copies ensures only
+one exclusive lock.
+
+
+#####
+# 3.
+
+### 3.a)
+
+The book document does not contain a reference to author. Instead of having a reference
+to author id in the book document, the _id of the book can be determined and then matched in the
+author document. This structure saves space and still does not require additional queries.
+
+
+{ _id: "9780316154697",
+  title: "Let's Explore Diabetes With Owls",
+  publisher: "Little, Brown",
+  num_pages: 288,
+  genre: "humor",
+  numInStock: 20
+}
+
+{ _id: "12345",
+	name: "David Sedaris",
+	dob: "1956-12-26",
+	books: [ { id: "9780316154697"}]
+}
+
+
+### 3.b)
+
+Advantage: If an author's data needs updated, such as a DOB correction, 
+	a single update can do it instead of updating the info in each 
+	place the author is embedded. 
+
+Disadvantage: To find the book and author information, two queries are need
+	as opposed to only one. If a book is found first, the author id is retrieved
+	and then the author name is retrieved with a second query.
+
+
+### 3.c)
+
+{ _id: "9780316154697",
+  title: "Let's Explore Diabetes With Owls",
+  publisher: "Little, Brown",
+  num_pages: 288,
+  genre: "humor",
+  numInStock: 20,
+  authors: [ { id: "12345",
+  	name: "David Sedaris",
+	dob: "1956-12-26"} ] 
+}
+
+
+### 3.d)
+
+Advantage: A single query gives access to all information on a book and author. 
+	This can save a lot of time, especially if the system does many queries. 
+
+Disadvantage: The author's data including name and DOB may be stored many times. 
+	This uses more disk space compared to methods where it's stored once. 
+
+
+### 3.e)
+
+{ _id: "9780316154697",
+  title: "Let's Explore Diabetes With Owls",
+  publisher: "Little, Brown",
+  num_pages: 288,
+  genre: "humor",
+  numInStock: 20
+}
+
+{ _id: "88888",
+	date: "2013-11-26",
+	time: "12:00",
+	book: "9780316154697",
+	numSold: 2
+}
+
+
+### 3.f)
+
+{ _id: "9780316154697",
+  title: "Let's Explore Diabetes With Owls",
+  publisher: "Little, Brown",
+  num_pages: 288,
+  genre: "humor",
+  numInStock: 20,
+  sales: [ { date: "2013-11-26",
+	time: "12:00",
+	book: "9780316154697",
+	numSold: 2
+	} ]
+}
+
+
+### 3.g) For atomicity, 3.f is better because the book inventory can be adjusted and the
+	sale can be recorded with a single logical operation. Also atomic updates are
+	possible with 3.f such as a numSold correction and inventory adjustment operation.
+		For allocated disk space, 3.e is better because it prevents the single 
+	book/sale document from getting too large and needing to be relocated. A sale 
+	requires more requests and IO though to make the sale and then adjust the inventory.
+	
+
+
+#####
+# 4.)
+
+The same fully distributed locking scheme from lecture exists but different numbers 
+of locks are required. Global and local exclusive, update, and shared locks exist.
+
+n total locks
+
+
+global exclusive lock: x (where x > n/2) local exclusive locks are required. 
+  This ensures one global exclusive lock at a time. 
+
+
+global update lock: u (where u >= x) local update locks are required. 
+  This ensures one global update lock at a time. 
+  Global shared locks can exist when the global update lock is created. 
+  Global shared locks cannot be created when the global update lock already exists.
+
+
+global shared locks: s (where s > n - x) local shared locks are required. 
+  When a global exclusive lock exists, a global shared cannot form 
+  and vice versa. 
+
+
+
+
+
+
+
+
+
+
+
+
